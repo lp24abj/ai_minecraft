@@ -53,7 +53,7 @@ def isHouseBlock(width,length,startPoint,box):
     for i in width:
         for j in length:
             current_height = box(x+i,y+j).heigth
-            if current_height > height or current_height < height:
+            if current_height > height +1 or current_height < height - 1:
                 isBlock = True
                 break;
     
