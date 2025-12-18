@@ -11,9 +11,9 @@ class House:
         self.width = pSize[0]
         self.length = pSize[1]
         self.height = pSize[2]
-
+#house 11 [18,11,7]
 def initialPopulation():
-    list_house = [[10,15,20],[10,20,20],[10,30,20],[5,5,20],[5,10,20],[5,15,20],[20,10,20],[20,20,30],[20,30,20],[10,10,20]]
+    list_house = [[11,12,7],[10,7,6],[10,9,8],[6,6,6],[4,5,6],[7,9,4],[7,10,12],[4,5,5],[9,11,8],[7,6,7]]
     #one house is gene
     population = []
     #debug 

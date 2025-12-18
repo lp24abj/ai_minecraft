@@ -1,7 +1,7 @@
 import AmuletUtilities
 from numpy import empty
 #This function build the heightmao for a given selection.
-def getHeightMap(level, box):
+def GetHeightMap(level, box):
     xmin = box.min_x
     xmax = box.max_x
 
