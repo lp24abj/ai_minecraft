@@ -1,13 +1,31 @@
+from unittest import case
 import AmuletUtilities
-from numpy import empty
 import random
+import numpy as np
 from amulet.api.block import Block
+import amulet
+# from amulet.api.operations import paste
+from amulet.api.selection import SelectionBox
+
 
 from types import SimpleNamespace
 #variables
 NUMBER_GENE = 10
 NUMBER_POPULATION = 200
-LIST_HOUSE = [[11,12,7],[10,7,6],[10,9,8],[6,6,6],[4,5,6],[7,9,4],[7,10,12],[4,5,5],[9,11,8],[7,6,7]]
+LIST_HOUSE = [
+    [13,14,7,"house_1.schem"],
+    [9,10,6,"house_2.schem"],
+    [10,10,8,"house_3.schem"],
+    [8,6,6,"house_4.schem"],
+    [8,6,6,"house_5.schem"],
+    [9,7,4,"house_6.schem"],
+    [11,17,7,"house_11.schem"],
+    [8,6,5,"house_8.schem"], 
+    [13,11,7,"house_9.schem"],
+    [8,7,6,"house_10.schem"],
+    #[12,7,12,"house_7.schem"], #church
+    # [11,17,7,"house_11.schem"]
+  ]
 
 #create population
 class House:
@@ -18,6 +36,7 @@ class House:
     # height = 0
     def __init__(self, pName, pSize):
         self.name = pName
+        self.schem = pSize[3]
         self.width = pSize[0]
         self.length = pSize[1]
         self.height = pSize[2]
@@ -37,14 +56,14 @@ def GenerticAlgorithm(box,height_map,population):
     # print(len(population))
     #step 2: calculate fitness
     # print(selection[0])
-    house_withFitness = []
+    chromosome_with_fitness = []
     for chromosome in population:
       # print(chromosome.genes)
       # print("Evaluating chromosome with genes: ", [house.name for house in env.genes])
-      generation, fitness = CalculateFitness(box[0], height_map, chromosome.genes)
+      genes, fitness = CalculateFitness(box[0], height_map, chromosome.genes)
       # print("Fitness: ", fitness)
-      house_withFitness.append(Chromosome(generation, fitness))
-    return house_withFitness
+      chromosome_with_fitness.append(Chromosome(genes, fitness))
+    return chromosome_with_fitness
 def InitialPopulation():
     population = []
     for _ in range(NUMBER_POPULATION):
@@ -56,128 +75,72 @@ def InitialPopulation():
         population.append(Chromosome(genes, -1))
 
     return population
-def CalculateFitness(box,height_map, genes):
-    xmin = box.min_x
-    xmax = box.max_x
+def InitCentralChurch(box):
+    # Precompute area once
+    width = box.max_x - box.min_x
+    depth = box.max_z - box.min_z
+    out = []
 
-    zmin = box.min_z
-    zmax = box.max_z
+    house = House("central", [1,1,9,"central.schem"])
+    house.startPoint = SimpleNamespace()
+    house.startPoint.x = random.randint(0, width - house.width)
+    house.startPoint.z = random.randint(0, depth - house.length)
 
-    width = xmax - xmin
-    depth = zmax - zmin
+    return house
+def CalculateFitness(box, height_map, genes):
+    # Precompute area once
+    width = box.max_x - box.min_x
+    depth = box.max_z - box.min_z
+    out = []
 
+    total_block = 0
+    n = len(genes)
+    if n == 0:
+        return [], 0.0
 
-
-    #if house in flat area fitness =  1
-    #if house is not enough area fitness = 0
-    house_withFitness = []
-    totalBlock=0
-    #update the list as good gene and update to next
     for house in genes:
-      # print(house)
-      if house.startPoint.x == 0 and house.startPoint.z == 0:
-        start_point = SimpleNamespace()
-        start_point.x = random.randint(0, width- house.width)
-        start_point.z = random.randint(0, depth- house.length)  
-        house.startPoint = start_point
-      # print("House: ", house.name, " at ", start_point.x, start_point.z)
-      # print("House size: ", house.width, house.length, house.height)  
-      # print("isHouseBlock: ", house.isBlock)
-      house.isBlock,house.startPoint.x,house.startPoint.z,house.startPoint.y,house.floor = isHouseBlock(genes,house, height_map)
-      # blockByOther = isHouseBlockByOtherHouse(genes, house, height_map)
-      # if blockByOther == True:
-      #     house.isBlock = True
-      if house.isBlock == True:
-          totalBlock +=1
-      house_withFitness.append(house)
-    return house_withFitness,totalBlock/len(genes) 
+        sp = house.startPoint
 
+        # Randomize start point if not set
+        if sp.x == 0 and sp.z == 0:
+            house.startPoint = SimpleNamespace()
+            house.startPoint.x = random.randint(0, width - house.width)
+            house.startPoint.z = random.randint(0, depth - house.length)
 
-# def NextGeneration(population_withFitness):
-#     #create next generation
-#     selected_population = selection(population_withFitness)
-#     next_generation = []
-#     while len(next_generation) < NUMBER_POPULATION:
-#         # random.seed()
-#         parent1 = random.choice(selected_population)
-#         parent2 = random.choice(selected_population)
-#         #crossover
-#         #get all house from parent1 and parent2 whern isblock is false
-#         parent1_genes = [house for house in parent1.genes if not house.isBlock]
-#         # for house in parent1_genes:
-#         #     print("Parent1 house: ", house.name, " isBlock: ", house.isBlock)
-#         parent2_genes = [house for house in parent2.genes if not house.isBlock]
-#         # for house in parent2_genes:
-#         #     print("Parent2 house: ", house.name, " isBlock: ", house.isBlock)
-#         #merge genes
-#         merge_genes = parent1_genes + parent2_genes
-#         #remove duplicate genes by name and start point
-#         unique_genes = {}
-#         for house in merge_genes:
-#             key = (house.name, house.startPoint.x, house.startPoint.z)
-#             if key not in unique_genes:
-#                 unique_genes[key] = house
-#         parent_genes = list(unique_genes.values())
+        # Compute blocking + update fields in one call
+        house.isBlock, house.startPoint.y, house.floor = isHouseBlock(genes, house, height_map)
+        if house.isBlock:
+            total_block += 1
 
-#         #check length of parent genes
-#         if len(parent_genes) >= NUMBER_GENE:
-#             #random select genes from parent1 and parent2
-#             print("Crossover from parents")
-#             child_genes = random.sample(parent_genes, NUMBER_GENE)
-#         else:
-#             print("Not enough genes from parents, filling with random genes",len(parent_genes))
-#             #if not enough genes, fill with random genes
-#             child_genes = parent_genes
-#             list_house = [[11,12,7],[10,7,6],[10,9,8],[6,6,6],[4,5,6],[7,9,4],[7,10,12],[4,5,5],[9,11,8],[7,6,7]]
-#             while len(child_genes) < NUMBER_GENE:
-#                 random.seed()
-#                 child_genes.append(House(f"house_{len(child_genes)+1}", list_house[random.randint(0, 9)]))
+        out.append(house)
 
-#         # crossover_point = random.randint(1, NUMBER_GENE - 1)
-#         # child_genes = parent1.genes[:crossover_point] + parent2.genes[crossover_point:]
-#         #mutation
-#         # if random.random() < 0.1:  #10% chance of mutation
-#         #     mutation_point = random.randint(0, NUMBER_GENE - 1)
-#         #     list_house = [[11,12,7],[10,7,6],[10,9,8],[6,6,6],[4,5,6],[7,9,4],[7,10,12],[4,5,5],[9,11,8],[7,6,7]]
-#         #     child_genes[mutation_point] = House(f"house_{mutation_point+1}", list_house[random.randint(0, 9)])
-#         next_generation.append(Chromosome(child_genes, -1))
-#     return next_generation   
+    return out, total_block / n
+
+    
+
 def selection(population_withFitness):
     #select the best gene
     sorted_population = sorted(population_withFitness, key=lambda x: x.fitness, reverse=False)
     # print("Sorted population: ", sorted_population)
 
     #select top 20%
-    selected_population = sorted_population[:len(sorted_population)//20]
-    for individual in selected_population:
-        print("Individual fitness: ", individual.fitness)
+    selected_population = sorted_population[:len(sorted_population)//2]
+    # for individual in selected_population:
+    #     print("Individual fitness: ", individual.fitness)
     return selected_population
 
-def renderHouse(house, box, level):
-    xmin = box.min_x
-    zmin = box.min_z
 
-    xmax = box.max_x
-    zmax = box.max_z
-    
-    x = house.startPoint.x
-    z = house.startPoint.z
-    y = house.startPoint.y
-    # for i in range(0, house.width):
-    #     for j in range(0, house.length):
-    #         goldBlock = Block("minecraft", "gold_block")
-    #         AmuletUtilities.setBlockAt(xmin+x+i, y, zmin+z+j, goldBlock, level)
-    for coord in house.floor:
-        goldBlock = Block("minecraft", "gold_block")
-        AmuletUtilities.setBlockAt(xmin+coord[0], y, zmin+coord[1], goldBlock, level)
+
 def isHouseBlock(genes,house, box):
     x = house.startPoint.x
     z = house.startPoint.z
     # print("Start Point: ", x, z)
     #get height at start point from heightmap
     height = box[x,z]
+    if height == -1:
+        return True, 0, []
+    
     # print(height)
-    isBlock = False
     floor =[]
     for i in range(0, house.width):
         for j in range(0, house.length):
@@ -185,39 +148,20 @@ def isHouseBlock(genes,house, box):
             current_height = box[x+i,z+j]
             floor.append([x+i,z+j])
             if current_height > height or current_height < height:
-                return True, x, z, height, floor
+                return True, 0, []
     # print("Checked House with house")
     for other_house in genes:
         if other_house != house:
             common_elements = set(map(tuple, other_house.floor)) & set(map(tuple, house.floor))
             if common_elements:
-                return True,x,z,height,floor
-    return False,x,z,height,floor
-
-def GetHeightMap(level, selection):
-    xmin = selection.min_x
-    xmax = selection.max_x
-
-    zmin = selection.min_z
-    zmax = selection.max_z
-
-    width = xmax - xmin
-    depth = zmax - zmin
-
-    #We are storing our Heightmap in a 2D array.
-    heightMap = empty((width, depth), dtype=int)
-
-    for x in range(xmin, xmax):
-        for z in range(zmin, zmax):
-            for y in range(255, - 1, -1):  #Y goes from 255 to 0        
-                #For each location, we retrieve the block existing at these coordinates.
-                block = AmuletUtilities.getBlockAt(x, y, z, level)
-                if AmuletUtilities.isBlockAir(block) == False:
-                    heightMap[x - xmin, z - zmin] = y
-                    break
-
-    return heightMap
-
+                return True,0,[]
+    return False,height,floor
+#FINIAL LIS
+def GetTheBestGenome(box, height_map, population_withFitness):
+    #fiter only non-block house
+    sorted_population = sorted(population_withFitness, key=lambda x: x.fitness, reverse=False)
+    best_genome = sorted_population[0]
+    return best_genome
 
 #NEXT GENERATION FUNCTION UPDATED
 def _gene_key(house):
@@ -257,12 +201,10 @@ def NextGeneration(population_withFitness):
         parent_genes = _dedupe_genes(p1 + p2)
 
         if len(parent_genes) >= NUMBER_GENE:
-            # if debug:
-            print("Crossover from parents")
+            # print("Crossover from parents")
             child_genes = random.sample(parent_genes, NUMBER_GENE)
         else:
-            # if debug:
-            print("Not enough genes, filling:", len(parent_genes))
+            # print("Not enough genes, filling:", len(parent_genes))
             child_genes = list(parent_genes)
 
             # Fill remaining slots
@@ -271,3 +213,47 @@ def NextGeneration(population_withFitness):
 
         next_generation.append(Chromosome(child_genes, -1))
     return next_generation
+
+#Generate House function
+def renderHouseFloor(house, box, level):
+    xmin = box.min_x
+    zmin = box.min_z
+    
+    y = house.startPoint.y
+    
+    for coord in house.floor:
+        cobbleBlock = Block("minecraft", "cobblestone")
+        AmuletUtilities.setBlockAt(xmin+coord[0], y, zmin+coord[1], cobbleBlock, level)
+    #for debug with 10 house types
+    # if house.name =="house_1":
+    #         block = Block("minecraft", "white_concrete")
+    # elif house.name == "house_2":
+    #         block = Block("minecraft", "black_concrete")
+    # elif house.name == "house_3":
+    #         block = Block("minecraft", "red_concrete")
+    # elif house.name == "house_4":
+    #         block = Block("minecraft", "blue_concrete")
+    # elif house.name == "house_5":
+    #         block = Block("minecraft", "lime_concrete")
+    # elif house.name == "house_6":
+    #         block = Block("minecraft", "yellow_concrete")
+    # elif house.name == "house_7":
+    #         block = Block("minecraft", "orange_concrete")
+    # elif house.name == "house_8":
+    #         block = Block("minecraft", "magenta_concrete")
+    # elif house.name == "house_9":
+    #         block = Block("minecraft", "cyan_concrete")
+    # elif house.name == "house_10":
+    #         block = Block("minecraft", "purple_concrete")
+    # print("Rendering house: ", block)
+    # AmuletUtilities.setBlockAt(xmin+house.startPoint.x, y, zmin+house.startPoint.z, block, level)
+
+
+#Issue 1:
+# House next to house
+# House in the top of house
+# House in water and lava
+
+
+
+
