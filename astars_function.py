@@ -100,8 +100,6 @@ class DSU:
                 self.rank[root2] += 1
             return True
         return False
-
-
 def mst_kruskal(object, edges):
     sorted_edges =sorted(edges, key=lambda x: x[0], reverse=False)
     # print("Sorted edges for MST: ", sorted_edges)

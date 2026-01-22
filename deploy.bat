@@ -1,4 +1,0 @@
-xcopy /Y "C:\Users\phamt\Documents\Master Study\7WCM0043-0901-2021 - AI Programing\final\ai_minecraft\minecraft_map.py" "C:\Users\phamt\AppData\Local\AmuletTeam\AmuletMapEditor\plugins\operations\minecraft_map.py"
-xcopy /Y "C:\Users\phamt\Documents\Master Study\7WCM0043-0901-2021 - AI Programing\final\ai_minecraft\enviroment.py" "C:\Users\phamt\AppData\Local\AmuletTeam\AmuletMapEditor\plugins\operations\enviroment.py"
-xcopy /Y "C:\Users\phamt\Documents\Master Study\7WCM0043-0901-2021 - AI Programing\final\ai_minecraft\generic_house.py" "C:\Users\phamt\AppData\Local\AmuletTeam\AmuletMapEditor\plugins\operations\generic_house.py"
-xcopy /Y "C:\Users\phamt\Documents\Master Study\7WCM0043-0901-2021 - AI Programing\final\ai_minecraft\astars_function.py" "C:\Users\phamt\AppData\Local\AmuletTeam\AmuletMapEditor\plugins\operations\astars_function.py"

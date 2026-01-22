@@ -1,3 +1,4 @@
+import math
 from unittest import case
 import AmuletUtilities
 import random
@@ -6,6 +7,7 @@ from amulet.api.block import Block
 import amulet
 # from amulet.api.operations import paste
 from amulet.api.selection import SelectionBox
+from collections import Counter
 
 
 from types import SimpleNamespace
@@ -13,27 +15,29 @@ from types import SimpleNamespace
 NUMBER_GENE = 10
 NUMBER_POPULATION = 200
 LIST_HOUSE = [
-    [13,14,7,"house_1.schem"],
-    [9,10,6,"house_2.schem"],
-    [10,10,8,"house_3.schem"],
-    [8,6,6,"house_4.schem"],
-    [8,6,6,"house_5.schem"],
-    [9,7,4,"house_6.schem"],
-    [11,17,7,"house_11.schem"],
-    [8,6,5,"house_8.schem"], 
-    [13,11,7,"house_9.schem"],
-    [8,7,6,"house_10.schem"],
+    [13,14,7,"house_1.schem","House"],
+    [9,10,6,"house_2.schem","Jail"],
+    [10,10,8,"house_3.schem","House"],
+    [8,6,6,"house_4.schem","Storage"],
+    [8,6,6,"house_5.schem","Storage"],
+    [9,7,4,"house_6.schem","Farm"],
+    [11,17,7,"house_11.schem","Watchtower"],
+    [8,6,5,"house_8.schem","Storage"], 
+    [13,11,7,"house_9.schem","House"],
+    [8,7,6,"house_10.schem","Storage"],
     #[12,7,12,"house_7.schem"], #church
     # [11,17,7,"house_11.schem"]
   ]
+HOUSE_TYPES = {
+    "House":2,
+    "Farm":1,
+    "Storage":4,
+    "Jail":1,
+    "Watchtower":2,
+}
 
 #create population
 class House:
-    #size of house calculate by block in minecraft
-    # name=''
-    # width = 0
-    # length = 0
-    # height = 0
     def __init__(self, pName, pSize):
         self.name = pName
         self.schem = pSize[3]
@@ -46,16 +50,13 @@ class House:
         self.startPoint.y = 0
         self.floor = []
         self.isBlock = False
+        self.type = pSize[4]
 class Chromosome:
     def __init__(self, genes, fitness):
         self.genes = genes
         self.fitness = fitness
 #house 11 [18,11,7]
 def GenerticAlgorithm(box,height_map,population):
-    
-    # print(len(population))
-    #step 2: calculate fitness
-    # print(selection[0])
     chromosome_with_fitness = []
     for chromosome in population:
       # print(chromosome.genes)
@@ -63,6 +64,7 @@ def GenerticAlgorithm(box,height_map,population):
       genes, fitness = CalculateFitness(box[0], height_map, chromosome.genes)
       # print("Fitness: ", fitness)
       chromosome_with_fitness.append(Chromosome(genes, fitness))
+      # print(fitness)
     return chromosome_with_fitness
 def InitialPopulation():
     population = []
@@ -75,32 +77,14 @@ def InitialPopulation():
         population.append(Chromosome(genes, -1))
 
     return population
-def InitCentralChurch(box):
-    # Precompute area once
-    width = box.max_x - box.min_x
-    depth = box.max_z - box.min_z
-    out = []
 
-    house = House("central", [1,1,9,"central.schem"])
-    house.startPoint = SimpleNamespace()
-    house.startPoint.x = random.randint(0, width - house.width)
-    house.startPoint.z = random.randint(0, depth - house.length)
-
-    return house
 def CalculateFitness(box, height_map, genes):
-    # Precompute area once
     width = box.max_x - box.min_x
     depth = box.max_z - box.min_z
     out = []
-
-    total_block = 0
-    n = len(genes)
-    if n == 0:
-        return [], 0.0
 
     for house in genes:
         sp = house.startPoint
-
         # Randomize start point if not set
         if sp.x == 0 and sp.z == 0:
             house.startPoint = SimpleNamespace()
@@ -109,25 +93,47 @@ def CalculateFitness(box, height_map, genes):
 
         # Compute blocking + update fields in one call
         house.isBlock, house.startPoint.y, house.floor = isHouseBlock(genes, house, height_map)
-        if house.isBlock:
-            total_block += 1
-
         out.append(house)
+    fitness_score  = fitness(out)
+    return out, fitness_score 
 
-    return out, total_block / n
-
+def fitness(chromosome):
+    total = len(chromosome)
+    valid = [h for h in chromosome if h.isBlock == False]
     
+    # 1. Buildability
+    buildability = len(valid) / total if total > 0 else 0
+    
+    # 2. Entropy on valid houses only
+    if len(valid) > 0:
+        types  = [h.type for h in valid]
+        entropy_score = normalized_entropy(types, len(HOUSE_TYPES))
+    else:
+        entropy_score = 0.0
+    # print("Buildability: %.4f, Entropy: %.4f" % (buildability, entropy_score))
+    return (
+        0.6 * buildability +
+        0.4 * entropy_score
+    )
+def normalized_entropy(items, num_types):
+    H = entropy(items)
+    # print("Entropy H: ", H)
+    H_max = math.log2(num_types)
+    return H / H_max
+
+def entropy(items):
+    counts = Counter(items)
+    total = sum(counts.values())
+    
+    H = 0.0
+    for count in counts.values():
+        p = count / total
+        H -= p * math.log2(p)
+    return H
 
 def selection(population_withFitness):
-    #select the best gene
-    sorted_population = sorted(population_withFitness, key=lambda x: x.fitness, reverse=False)
-    # print("Sorted population: ", sorted_population)
-
-    #select top 20%
-    selected_population = sorted_population[:len(sorted_population)//2]
-    # for individual in selected_population:
-    #     print("Individual fitness: ", individual.fitness)
-    return selected_population
+    selected = random.sample(population_withFitness, 3)
+    return max(selected, key=lambda x: x.fitness)
 
 
 
@@ -164,54 +170,49 @@ def GetTheBestGenome(box, height_map, population_withFitness):
     return best_genome
 
 #NEXT GENERATION FUNCTION UPDATED
-def _gene_key(house):
-    # same uniqueness rule you used
-    return (house.name, house.startPoint.x, house.startPoint.z)
-
-def _dedupe_genes(genes):
-    # preserves first occurrence order (Python 3.7+ dict keeps insertion order)
-    seen = {}
+def mutate(genes, mutation_rate):
     for g in genes:
-        k = _gene_key(g)
-        if k not in seen:
-            seen[k] = g
-    return list(seen.values())
+        if random.random() < mutation_rate:
 
-def _random_house(next_index):
-    # next_index is 1-based "house_#"
-    dims = random.choice(LIST_HOUSE)
-    return House(f"house_{next_index}", dims)
+            # 1. Mutate TYPE (quan trọng cho entropy)
+            # if random.random() < 0.5:
+                g = House("house_x", random.choice(LIST_HOUSE))
 
-def NextGeneration(population_withFitness):
-    selected_population = selection(population_withFitness)
+            # # 2. Mutate POSITION (an toàn)
+            # else:
+            #     g.startPoint.x += random.randint(-2, 2)
+            #     g.startPoint.z += random.randint(-2, 2)
+    return genes
+def crossover(p1_genes, p2_genes):
+    child = []
+    for g1, g2 in zip(p1_genes, p2_genes):
+        child.append(g1 if random.random() < 0.5 else g2)
+    return child
+def adaptive_mutation_rate(pop_entropy,
+                           min_rate=0.03,
+                           max_rate=0.25):
+    return min_rate + (1 - pop_entropy) * (max_rate - min_rate)
+def NextGeneration(population_withFitness, pop_entropy):
     next_generation = []
-
-    # minor safety: if selection() can return empty
-    if not selected_population:
-        raise ValueError("selection() returned empty population")
+    mutation_rate = adaptive_mutation_rate(pop_entropy)
 
     while len(next_generation) < NUMBER_POPULATION:
-        parent1, parent2 = random.sample(selected_population, 2)
-
+        parent1 = selection(population_withFitness)
+        parent2 = selection(population_withFitness)
+        # print("Selected parents with fitness: ", parent1.fitness, parent2.fitness)
         # Filter non-block genes once
-        p1 = [h for h in parent1.genes if not h.isBlock]
-        p2 = [h for h in parent2.genes if not h.isBlock]
+        p1_genes = parent1.genes
+        p2_genes = parent2.genes
 
-        # Merge + dedupe
-        parent_genes = _dedupe_genes(p1 + p2)
-
-        if len(parent_genes) >= NUMBER_GENE:
-            # print("Crossover from parents")
-            child_genes = random.sample(parent_genes, NUMBER_GENE)
-        else:
-            # print("Not enough genes, filling:", len(parent_genes))
-            child_genes = list(parent_genes)
-
-            # Fill remaining slots
-            while len(child_genes) < NUMBER_GENE:
-                child_genes.append(_random_house(len(child_genes) + 1))
+        # 1. Crossover
+        child_genes = crossover(p1_genes, p2_genes)
+        # print("Child genes before dedupe: ", [house.name for house in child_genes])
+        # 2. Mutation
+        child_genes = mutate(child_genes, mutation_rate)
+        # print("Child genes after mutation: ", [house.name for house in child_genes])
 
         next_generation.append(Chromosome(child_genes, -1))
+    
     return next_generation
 
 #Generate House function
@@ -224,29 +225,6 @@ def renderHouseFloor(house, box, level):
     for coord in house.floor:
         cobbleBlock = Block("minecraft", "cobblestone")
         AmuletUtilities.setBlockAt(xmin+coord[0], y, zmin+coord[1], cobbleBlock, level)
-    #for debug with 10 house types
-    # if house.name =="house_1":
-    #         block = Block("minecraft", "white_concrete")
-    # elif house.name == "house_2":
-    #         block = Block("minecraft", "black_concrete")
-    # elif house.name == "house_3":
-    #         block = Block("minecraft", "red_concrete")
-    # elif house.name == "house_4":
-    #         block = Block("minecraft", "blue_concrete")
-    # elif house.name == "house_5":
-    #         block = Block("minecraft", "lime_concrete")
-    # elif house.name == "house_6":
-    #         block = Block("minecraft", "yellow_concrete")
-    # elif house.name == "house_7":
-    #         block = Block("minecraft", "orange_concrete")
-    # elif house.name == "house_8":
-    #         block = Block("minecraft", "magenta_concrete")
-    # elif house.name == "house_9":
-    #         block = Block("minecraft", "cyan_concrete")
-    # elif house.name == "house_10":
-    #         block = Block("minecraft", "purple_concrete")
-    # print("Rendering house: ", block)
-    # AmuletUtilities.setBlockAt(xmin+house.startPoint.x, y, zmin+house.startPoint.z, block, level)
 
 
 #Issue 1:

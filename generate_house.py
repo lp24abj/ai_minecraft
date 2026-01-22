@@ -9,7 +9,7 @@ import logging
 import amulet
 
 import astars_function
-import enviroment
+import algorithms
 import minecraft_map
 
 # Select area 
@@ -20,38 +20,41 @@ import minecraft_map
 # y2 = 63
 # z2 = 257
 
-NUMBER_GENERATIONS = 200
+NUMBER_GENERATIONS = 50
+DIR_PATH = "C:\\Users\\phamt\\Desktop\\house\\"
 
 def operation(
     world: BaseLevel, dimension: Dimension, box: SelectionGroup, options: dict
 ): 
     height_map = minecraft_map.GetHeightMap(world, box[0])
     
-    np.save('C:\\Users\\phamt\\Desktop\\house\\array_file.npy', height_map)
-    logging.basicConfig(filename="C:\\Users\\phamt\\Desktop\\house\\ai-log.log", filemode="w",
-                    format="%(name)s → %(levelname)s: %(message)s")
+    # np.save('C:\\Users\\phamt\\Desktop\\house\\array_file.npy', height_map)
+    # logging.basicConfig(filename="C:\\Users\\phamt\\Desktop\\house\\ai-log.log", filemode="w",
+                    # format="%(name)s → %(levelname)s: %(message)s")
     # print(height_map)
     #genetic algorithm to place house in the area
     #step 1: create population
-    population = enviroment.InitialPopulation()
+    population = algorithms.InitialPopulation()
     for generation in range(0, NUMBER_GENERATIONS):
         # print("Generation: ", generation)
         # print(population)
-        house_withFitness = enviroment.GenerticAlgorithm(box,height_map, population)
-        logging.warning("House fitness in generation %d:", house_withFitness)
-        population = enviroment.NextGeneration(house_withFitness)
+        house_withFitness = algorithms.GenerticAlgorithm(box,height_map, population)
+        # logging.warning("House fitness in generation %d:", house_withFitness)
+        avg_fitness = sum(chromosome.fitness for chromosome in house_withFitness) / len(house_withFitness)
+        # logging.warning("Generation %d - Average Fitness: %.4f", generation, avg_fitness)
+        population = algorithms.NextGeneration(house_withFitness,avg_fitness)
     
     #get the best house
-    house_withFitness = enviroment.GenerticAlgorithm(box,height_map, population)
-    thebest_population = enviroment.GetTheBestGenome(box, height_map, house_withFitness)
-    dir_path = "C:\\Users\\phamt\\Desktop\\house\\"
+    house_withFitness = algorithms.GenerticAlgorithm(box,height_map, population)
+    thebest_population = algorithms.GetTheBestGenome(box, height_map, house_withFitness)
+    dir_path = DIR_PATH
     for house in thebest_population.genes:
         # print("House: ", house.name, " at ", house.startPoint.x, house.startPoint.z,house.startPoint.y)
         # print("House size: ", house.width, house.length, house.height)  
         # print("isHouseBlock: ", house.isBlock)
         if house.isBlock == False:
             # #for debugging purpose, we only render the floor of the house
-            enviroment.renderHouseFloor(house, box, world)
+            algorithms.renderHouseFloor(house, box, world)
             #render house
             schem_path = f"{dir_path}{house.schem}"
             structure = amulet.load_level(schem_path)
@@ -64,7 +67,6 @@ def operation(
             structure.close()
     #get hight map again after placing houses
     height_map = minecraft_map.GetHeightMap(world, box[0])
-    # central = thebest_population.genes[len(thebest_population.genes)-1]
     visited_houses = []
     edges = []
 
@@ -91,6 +93,6 @@ def operation(
             
 
 export = {  
-    "name": "Generic Robinhood",
+    "name": "Generate Robin Hood",
     "operation": operation,
 }
